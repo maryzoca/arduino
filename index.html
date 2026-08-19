@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Servomotores</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #1e1e1e;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 700px;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        h1 {
+            color: #00bfff;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 12px;
+            border-radius: 8px;
+            background: #444;
+        }
+
+        .conectado {
+            color: #00ff66;
+        }
+
+        .desconectado {
+            color: #ff4444;
+        }
+
+        .servos {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .servo {
+            background: #3a3a3a;
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        .servo h2 {
+            margin-bottom: 20px;
+        }
+
+        .led {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #333;
+            margin: 15px auto;
+            border: 2px solid #555;
+        }
+
+        .led.ligado {
+            background: red;
+            box-shadow: 0 0 20px red;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        .angulo {
+            font-size: 25px;
+            color: #00bfff;
+            margin-bottom: 15px;
+        }
+
+        button {
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            color: white;
+            background: #007acc;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0099ff;
+        }
+
+        #conectar {
+            background: #00a651;
+            font-size: 18px;
+            padding: 15px 30px;
+        }
+
+        #conectar:hover {
+            background: #00c766;
+        }
+
+        .botoes {
+            margin-top: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .servos {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Controle de Servomotores</h1>
+
+        <p>Arduino Uno - Controle via PC</p>
+
+        <div class="status">
+            Status:
+            <span id="status" class="desconectado">
+                Desconectado
+            </span>
+        </div>
+
+        <button id="conectar">Conectar ao Arduino</button>
+
+        <div class="servos">
+
+            <!-- SERVO 1 -->
+            <div class="servo">
+                <h2>Servo 1</h2>
+
+                <div id="led1" class="led"></div>
+
+                <div class="angulo">
+                    <span id="valor1">90</span>°
+                </div>
+
+                <input
+                    type="range"
+                    id="servo1"
+                    min="0"
+                    max="180"
+                    value="90"
+                >
+
+                <div class="botoes">
+                    <button onclick="moverServo(1, 0)">
+                        0°
+                    </button>
+
+                    <button onclick="moverServo(1, 90)">
+                        90°
+                    </button>
+
+                    <button onclick="moverServo(1, 180)">
+                        180°
+                    </button>
+                </div>
+            </div>
+
+
+            <!-- SERVO 2 -->
+            <div class="servo">
+                <h2>Servo 2</h2>
+
+                <div id="led2" class="led"></div>
+
+                <div class="angulo">
+                    <span id="valor2">90</span>°
+                </div>
+
+                <input
+                    type="range"
+                    id="servo2"
+                    min="0"
+                    max="180"
+                    value="90"
+                >
+
+                <div class="botoes">
+                    <button onclick="moverServo(2, 0)">
+                        0°
+                    </button>
+
+                    <button onclick="moverServo(2, 90)">
+                        90°
+                    </button>
+
+                    <button onclick="moverServo(2, 180)">
+                        180°
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        let porta;
+        let escritor;
+
+        const status = document.getElementById("status");
+        const botaoConectar = document.getElementById("conectar");
+
+        // CONECTAR AO ARDUINO
+        botaoConectar.addEventListener("click", async () => {
+
+            try {
+
+                porta = await navigator.serial.requestPort();
+
+                await porta.open({
+                    baudRate: 9600
+                });
+
+                escritor = porta.writable.getWriter();
+
+                status.textContent = "Conectado";
+                status.className = "conectado";
+
+                botaoConectar.textContent = "Arduino conectado";
+
+            } catch (erro) {
+
+                console.error(erro);
+
+                status.textContent = "Erro na conexão";
+                status.className = "desconectado";
+
+            }
+
+        });
+
+
+        // ENVIAR COMANDO PARA O ARDUINO
+        async function enviarComando(comando) {
+
+            if (!escritor) {
+                alert("Conecte o Arduino primeiro!");
+                return;
+            }
+
+            const dados = new TextEncoder().encode(comando + "\n");
+
+            await escritor.write(dados);
+        }
+
+
+        // MOVER SERVO
+        async function moverServo(numero, angulo) {
+
+            if (numero === 1) {
+
+                document.getElementById("servo1").value = angulo;
+                document.getElementById("valor1").textContent = angulo;
+
+                document.getElementById("led1")
+                    .classList.add("ligado");
+
+            } else {
+
+                document.getElementById("servo2").value = angulo;
+                document.getElementById("valor2").textContent = angulo;
+
+                document.getElementById("led2")
+                    .classList.add("ligado");
+            }
+
+            await enviarComando(
+                "S" + numero + ":" + angulo
+            );
+
+        }
+
+
+        // SLIDER DO SERVO 1
+        document.getElementById("servo1").addEventListener("input", function () {
+
+            const angulo = this.value;
+
+            document.getElementById("valor1").textContent = angulo;
+
+            document.getElementById("led1")
+                .classList.add("ligado");
+
+            enviarComando("S1:" + angulo);
+
+        });
+
+
+        // SLIDER DO SERVO 2
+        document.getElementById("servo2").addEventListener("input", function () {
+
+            const angulo = this.value;
+
+            document.getElementById("valor2").textContent = angulo;
+
+            document.getElementById("led2")
+                .classList.add("ligado");
+
+            enviarComando("S2:" + angulo);
+
+        });
+
+    </script>
+
+</body>
+</html>
